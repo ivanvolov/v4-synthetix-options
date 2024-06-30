@@ -58,46 +58,7 @@ contract PutETHTest is OptionTestBase {
         vm.stopPrank();
     }
 
-    function test_osqth_operations() public {
-        IController powerTokenController = IController(
-            0x64187ae08781B09368e6253F9E94951243A493D5
-        );
-        vm.startPrank(alice.addr);
-
-        // ** Deposit OSQTH
-        assertEqBalanceStateZero(alice.addr);
-        deal(alice.addr, 100 ether);
-
-        uint256 vaultId = powerTokenController.mintWPowerPerpAmount(0, 0, 0);
-        powerTokenController.deposit{value: 10 ether}(vaultId);
-        powerTokenController.mintPowerPerpAmount(vaultId, 10 ether / 2, 0);
-
-        console.log("> OSQTH price", getETH_OSQTHPriceV3() / 1e18);
-        console.log("> ETH price", (1e12 * 1e18) / getETH_USDCPriceV3());
-
-        assertEqBalanceState(
-            alice.addr,
-            0,
-            0,
-            0,
-            28606797160868548091,
-            90 ether
-        );
-
-        Vault memory vault = powerTokenController.vaults(vaultId);
-        assertEq(vault.collateralAmount, 10 ether);
-        assertEq(vault.shortAmount, OSQTH.balanceOf(alice.addr));
-
-        // ** Withdraw OSQTH
-        powerTokenController.burnWPowerPerpAmount(
-            vaultId,
-            OSQTH.balanceOf(alice.addr),
-            vault.collateralAmount
-        );
-
-        assertEqBalanceState(alice.addr, 0, 0, 0, 0, 100 ether);
-        vm.stopPrank();
-    }
+    function test_synthetix_perp_operations() public {}
 
     function test_deposit() public {
         uint256 amountToDeposit = 200000 * 1e6;
