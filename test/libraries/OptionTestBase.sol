@@ -12,6 +12,7 @@ import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 import {IChainlinkOracle} from "@forks/morpho-oracles/IChainlinkOracle.sol";
 import {IMorpho, MarketParams, Position as MorphoPosition, Id} from "@forks/morpho/IMorpho.sol";
 import {IOption} from "@src/interfaces/IOption.sol";
+import {SynthetixPerpHelper} from "@src/SynthetixPerpHelper.sol";
 
 import {TestERC20} from "v4-core/test/TestERC20.sol";
 import {Deployers} from "v4-core-test/utils/Deployers.sol";
@@ -22,6 +23,8 @@ abstract contract OptionTestBase is Test, Deployers {
     using TestAccountLib for TestAccount;
 
     IOption hook;
+
+    SynthetixPerpHelper synthetixPerpHelper;
 
     TestERC20 WSTETH;
     TestERC20 USDC;
@@ -39,11 +42,13 @@ abstract contract OptionTestBase is Test, Deployers {
     uint256 optionId;
 
     function labelTokens() public {
+        synthetixPerpHelper = new SynthetixPerpHelper();
+
         WSTETH = TestERC20(OptionBaseLib.WSTETH);
         vm.label(address(WSTETH), "WSTETH");
         USDC = TestERC20(OptionBaseLib.USDC);
         vm.label(address(USDC), "USDC");
-        OSQTH = TestERC20(OptionBaseLib.OSQTH);
+        OSQTH = TestERC20(address(synthetixPerpHelper));
         vm.label(address(OSQTH), "OSQTH");
         WETH = TestERC20(OptionBaseLib.WETH);
         vm.label(address(WETH), "WETH");

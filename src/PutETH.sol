@@ -15,8 +15,8 @@ import {ERC721} from "solmate/tokens/ERC721.sol";
 import {BaseOptionHook} from "@src/BaseOptionHook.sol";
 
 import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
-import {IController, Vault} from "@forks/squeeth-monorepo/IController.sol";
 import {Position as MorphoPosition, Id, Market} from "@forks/morpho/IMorpho.sol";
+import {SynthetixPerpHelper} from "@src/SynthetixPerpHelper.sol";
 
 /// @title Put like wstETH option
 /// @author IVikkk
@@ -24,16 +24,16 @@ import {Position as MorphoPosition, Id, Market} from "@forks/morpho/IMorpho.sol"
 contract PutETH is BaseOptionHook, ERC721 {
     using PoolIdLibrary for PoolKey;
 
-    IController constant powerTokenController =
-        IController(0x64187ae08781B09368e6253F9E94951243A493D5);
-
     uint256 public powerTokenVaultId;
+    SynthetixPerpHelper powerTokenWrapper;
 
     constructor(
         IPoolManager poolManager,
-        Id _morphoMarketId
+        Id _morphoMarketId,
+        address _powerTokenWrapper
     ) BaseOptionHook(poolManager) ERC721("PutETH", "PUT") {
         morphoMarketId = _morphoMarketId;
+        powerTokenWrapper = SynthetixPerpHelper(_powerTokenWrapper);
     }
 
     function afterInitialize(
@@ -52,8 +52,6 @@ contract PutETH is BaseOptionHook, ERC721 {
 
         WSTETH.approve(address(morpho), type(uint256).max);
         USDC.approve(address(morpho), type(uint256).max);
-
-        powerTokenVaultId = powerTokenController.mintWPowerPerpAmount(0, 0, 0);
 
         setTickLast(key.toId(), tick);
 
@@ -163,9 +161,8 @@ contract PutETH is BaseOptionHook, ERC721 {
                 address(this)
             );
             usdcToObtain = p.collateral;
-            Vault memory vault = powerTokenController.vaults(powerTokenVaultId);
-            osqthToRepay = vault.shortAmount;
-            ethToObtain = vault.collateralAmount;
+            osqthToRepay = powerTokenWrapper.shortAmount();
+            ethToObtain = powerTokenWrapper.collateralAmount();
         }
 
         if (wstETHToRepay == 0) {
@@ -201,11 +198,7 @@ contract PutETH is BaseOptionHook, ERC721 {
 
         // ** close OSQTH
         {
-            powerTokenController.burnWPowerPerpAmount(
-                powerTokenVaultId,
-                osqthToRepay,
-                ethToObtain
-            );
+            powerTokenWrapper.burn(osqthToRepay, ethToObtain);
 
             WETH.deposit{value: ethToObtain}();
 
@@ -250,16 +243,13 @@ contract PutETH is BaseOptionHook, ERC721 {
 
             OptionBaseLib.swapUSDC_OSQTH_In(uint256(int256(-deltas.amount1())));
 
-            Vault memory vault = powerTokenController.vaults(powerTokenVaultId);
-
             uint256 collateralToWithdraw = OptionMathLib.getAssetsBuyShares(
                 OSQTH.balanceOf(address(this)),
-                vault.shortAmount,
-                vault.collateralAmount
+                powerTokenWrapper.shortAmount(),
+                powerTokenWrapper.collateralAmount()
             );
 
-            powerTokenController.burnWPowerPerpAmount(
-                powerTokenVaultId,
+            powerTokenWrapper.burn(
                 OSQTH.balanceOf(address(this)),
                 collateralToWithdraw
             );
@@ -281,15 +271,8 @@ contract PutETH is BaseOptionHook, ERC721 {
                 address(WETH),
                 uint256(int256(-deltas.amount0()))
             );
-            WETH.withdraw(wethAmountOut);
-            powerTokenController.deposit{value: wethAmountOut}(
-                powerTokenVaultId
-            );
-            powerTokenController.mintPowerPerpAmount(
-                powerTokenVaultId,
-                wethAmountOut / cRatio,
-                0
-            );
+            powerTokenWrapper.deposit(wethAmountOut);
+            powerTokenWrapper.mint(wethAmountOut / cRatio);
             OptionBaseLib.swapOSQTH_USDC_In(OSQTH.balanceOf(address(this)));
         } else {
             console.log("> price not changing...");
